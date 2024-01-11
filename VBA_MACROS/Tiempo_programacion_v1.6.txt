@@ -1,0 +1,516 @@
+' ========================EVENTO EN HOJA=========================================
+' Para lograr lo que deseas, puedes hacer uso de un evento de hoja de cálculo
+' llamado Worksheet_SelectionChange. Este evento se activa cada vez que se cambia
+' la selección en la hoja.
+' En el panel de la izquierda, busca la hoja donde deseas que se active esta funcionalidad.
+' Haz doble clic en el nombre de la hoja.
+' En la ventana que aparece a la derecha, pega el siguiente código:
+
+Private Sub Worksheet_SelectionChange(ByVal Target As Range)
+    Dim intersectRange As Range
+    Dim lastRow As Long
+
+    ' Encontrar la última fila con datos en la columna B
+    lastRow = Me.Cells(Me.Rows.Count, "B").End(xlUp).Row
+
+    ' Limpiar el color de todas las celdas en la columna B desde la fila 2 hasta el final
+    If lastRow > 1 Then ' Si hay más de una fila con datos
+        Me.Range("B2:B" & lastRow).Interior.ColorIndex = xlNone
+    End If
+
+    ' Verificar si la selección se cruza con la columna J y no es la fila 1
+    Set intersectRange = Intersect(Target, Me.Range("J:J"))
+    If Not intersectRange Is Nothing And Target.Row <> 1 Then
+        ' Si la celda en la columna B no está vacía, pintarla de amarillo
+        If Trim(Me.Cells(Target.Row, 2).Value) <> "" Then
+            Me.Cells(Target.Row, 2).Interior.Color = RGB(255, 255, 0) 'Amarillo
+        End If
+    End If
+End Sub
+
+
+
+' =============================== MACROS =========================================
+Sub ExportarNewProject()
+
+    ' Declarar variables
+    Dim proyecto As MSProject.Project
+    Dim tarea As MSProject.Task
+    Dim celda As Range
+    Dim fila As Long
+    Dim ultimaFila As Long
+    Dim Proj As MSProject.Application
+    Dim nivelSangria As Integer
+    
+    ' Cambiar a la hoja "PRESUPUESTO"
+    ' Sheets("PRESUPUESTO").Activate
+    
+    On Error Resume Next
+    ' Intentar obtener una instancia existente de MS Project
+    Set Proj = GetObject(, "MSProject.Application")
+    On Error GoTo 0
+    
+    ' Si MS Project no está abierto, crear una nueva instancia
+    If Proj Is Nothing Then
+        Set Proj = New MSProject.Application
+        Proj.FileNew
+    End If
+
+    Proj.Visible = True
+    
+    ' Establecer referencia al proyecto activo de MS Project
+    Set proyecto = Proj.ActiveProject
+     
+    ' Obtener la última fila de datos en la hoja de Excel
+    ultimaFila = ActiveSheet.Cells(Rows.Count, "B").End(xlUp).Row
+     
+    ' Recorrer las celdas de la columna B y agregar tareas al proyecto
+    For fila = 2 To ultimaFila
+        ' Crear una nueva tarea en el proyecto con el nombre de la tarea sin espacios iniciales
+        Set tarea = proyecto.Tasks.Add(Trim(ActiveWorkbook.ActiveSheet.Cells(fila, "B").Value))
+        
+        ' Establecer la duración de la tarea
+        tarea.Duration = ActiveWorkbook.ActiveSheet.Cells(fila, "K").Value * 480
+        tarea.WBS = ActiveWorkbook.ActiveSheet.Cells(fila, "A").Value
+        tarea.Text1 = ActiveWorkbook.ActiveSheet.Cells(fila, "A").Value
+        
+        ' Determinar el nivel de sangría basado en la cantidad de puntos en la celda de la columna A
+        nivelSangria = Len(ActiveWorkbook.ActiveSheet.Cells(fila, "A").Value) - Len(Replace(ActiveWorkbook.ActiveSheet.Cells(fila, "A").Value, ".", ""))
+        tarea.OutlineLevel = nivelSangria + 1
+    Next fila
+    
+    'Minimizar la ventana de Project
+    Proj.WindowState = pjMinimized
+    
+    'Mensaje de éxito
+    MsgBox "El proyecto se ha exportado correctamente.", vbInformation, "Exportar Proyecto"
+    
+    ' Regresar a la hoja "TIEMPOS DE PROGRAMACIÓN"
+    ThisWorkbook.Sheets("TIEMPOS DE PROGRAMACIÓN").Activate
+      
+End Sub
+Sub ExportarPlantillaProject()
+
+    ' Declarar variables
+    Dim proyecto As MSProject.Project
+    Dim tarea As MSProject.Task
+    Dim fila As Long
+    Dim ultimaFila As Long
+    Dim Proj As MSProject.Application
+    Dim IsProjOpen As Boolean
+    Dim nivelSangria As Integer
+
+    ' Verificar si MS Project ya está abierto
+    On Error Resume Next
+    Set Proj = GetObject(, "MSProject.Application")
+    On Error GoTo 0
+
+    If Proj Is Nothing Then
+        ' Inicializar Project si no estaba abierto
+        Set Proj = CreateObject("MSProject.Application")
+        IsProjOpen = False
+    Else
+        IsProjOpen = True
+    End If
+
+    Proj.FileOpenEx ("Plantilla_Project.mpt")
+    Proj.Visible = True
+
+    ' Establecer referencia al proyecto activo de MS Project
+    Set proyecto = Proj.ActiveProject
+
+    ' Obtener la última fila de datos en la hoja de Excel
+    ultimaFila = ActiveSheet.Cells(Rows.Count, "B").End(xlUp).Row
+
+    ' Recorrer las celdas de la columna B y agregar tareas al proyecto
+    For fila = 2 To ultimaFila
+        ' Crear una nueva tarea en el proyecto con el texto limpio (sin espacios delante o detrás)
+        Set tarea = proyecto.Tasks.Add(Trim(ActiveWorkbook.ActiveSheet.Cells(fila, "B").Value))
+        
+        ' Establecer la duración de la tarea
+        tarea.Duration = ActiveWorkbook.ActiveSheet.Cells(fila, "K").Value * 480
+        tarea.WBS = Trim(ActiveWorkbook.ActiveSheet.Cells(fila, "A").Value)
+        tarea.Text1 = Trim(ActiveWorkbook.ActiveSheet.Cells(fila, "A").Value)
+        
+        ' Asignar valores limpios de las columnas C, D y E a los campos correspondientes de MS Project
+        tarea.Text4 = Trim(ActiveWorkbook.ActiveSheet.Cells(fila, "C").Value) ' Asignar valor de Und.
+        tarea.Text2 = Trim(ActiveWorkbook.ActiveSheet.Cells(fila, "D").Value) ' Asignar valor de Metrado
+        tarea.Text3 = Trim(ActiveWorkbook.Sheets("PRESUPUESTO").Cells(fila, "E").Value) ' Asignar valor de Precio (S/)
+        
+        ' Determinar el nivel de sangría basado en la cantidad de puntos en la celda de la columna A
+        nivelSangria = Len(ActiveWorkbook.Sheets("PRESUPUESTO").Cells(fila, "A").Value) - Len(Replace(ActiveWorkbook.Sheets("PRESUPUESTO").Cells(fila, "A").Value, ".", ""))
+        tarea.OutlineLevel = nivelSangria + 1
+    Next fila
+
+    ' Minimizar la ventana de Project
+    Proj.WindowState = pjMinimized
+
+    ' Mensaje de éxito
+    MsgBox "El proyecto se ha exportado correctamente.", vbInformation, "Exportar Proyecto"
+    
+    ' Regresar a la hoja "TIEMPOS DE PROGRAMACIÓN"
+    ThisWorkbook.Sheets("TIEMPOS DE PROGRAMACIÓN").Activate
+
+End Sub
+
+Sub EvaluarCelda()
+
+    Dim lastRow As Long
+    Dim i As Long
+    
+    'Obtener la última fila con datos
+    lastRow = ActiveSheet.Cells(Rows.Count, "H").End(xlUp).Row
+    
+    'Recorrer todas las filas con datos en la columna H
+    For i = 2 To lastRow
+    
+        'Evaluar la celda H en cada fila
+        If ActiveSheet.Cells(i, "H").Value = "" Then
+            ActiveSheet.Cells(i, "M").Value = ""
+        Else
+            ActiveSheet.Cells(i, "M").Value = 1
+        End If
+    
+    Next i
+
+End Sub
+Sub BorrarColumnaM()
+    'Establecer la última fila con datos en la columna M
+    ultimaFila = Cells(Rows.Count, "M").End(xlUp).Row
+    
+    'Verificar si la última fila con datos es mayor o igual a la fila 2
+    If ultimaFila >= 2 Then
+        'Borrar los valores en la columna M desde la fila 2 hasta la última fila
+        Range("M2:M" & ultimaFila).ClearContents
+    End If
+End Sub
+Sub CopiarColumnaYPintar()
+    Dim ultimaFila As Long
+    Dim dataPresent As Boolean
+    Dim i As Long
+    
+    ' Obtener la última fila de datos en la hoja de Excel
+    ultimaFila = ActiveSheet.Cells(Rows.Count, "M").End(xlUp).Row
+    
+    ' Inicializar el indicador de datos
+    dataPresent = False
+    
+    ' Verificar si hay datos en la columna M desde la fila 2 en adelante
+    For i = 2 To ultimaFila
+        If Not IsEmpty(ActiveSheet.Cells(i, "M").Value) Then
+            dataPresent = True
+            Exit For
+        End If
+    Next i
+    
+    ' Si no hay datos en la columna M, salir de la macro
+    If Not dataPresent Then Exit Sub
+    
+    ' Copiar los valores de la columna M a la columna J
+    Range("M2:M" & ultimaFila).Copy Destination:=Range("J2")
+    
+    ' Pintar la columna J con el color especificado
+    Range("J2:J" & ultimaFila).Interior.Color = RGB(255, 255, 204)
+    
+    ' Colocar todos los bordes en la columna J
+    With Range("J2:J" & ultimaFila).Borders
+        .LineStyle = xlContinuous
+        .Weight = xlThin
+        .Color = RGB(0, 0, 0)
+    End With
+End Sub
+Sub LlenarColumnaL()
+    Dim ultimaFila As Long
+    ultimaFila = ActiveSheet.Cells(Rows.Count, "M").End(xlUp).Row
+    
+    If ultimaFila = 1 And ActiveSheet.Cells(1, "M").Value = "" Then Exit Sub
+    
+    For i = 2 To ultimaFila
+        If ActiveSheet.Cells(i, "M").Value = 1 Then
+            If ActiveSheet.Cells(i, "G").Value = ActiveSheet.Cells(i, "J").Value Then
+                ActiveSheet.Cells(i, "L").Value = ""
+            Else
+                ActiveSheet.Cells(i, "L").Value = "CAMBIAR EN PROJECT"
+            End If
+        Else
+            ActiveSheet.Cells(i, "L").Value = ""
+        End If
+    Next i
+End Sub
+Sub BorrarColumnaL()
+    'Establecer la última fila con datos en la columna L
+    ultimaFila = Cells(Rows.Count, "L").End(xlUp).Row
+    
+    'Verificar si la última fila con datos es mayor o igual a la fila 2
+    If ultimaFila >= 2 Then
+        'Borrar los valores en la columna L desde la fila 2 hasta la última fila
+        Range("L2:L" & ultimaFila).ClearContents
+    End If
+End Sub
+Sub RellenarColumnaK()
+    Dim ultimaFila As Long
+    Dim rangoFormato As Range
+    Dim celda As Range
+    Dim valorH As Double
+    Dim valorJ As Double
+    Dim resultado As Double
+    
+    'Obtener la última fila de datos en la columna B como referencia
+    ultimaFila = ActiveSheet.Cells(Rows.Count, "B").End(xlUp).Row
+    
+    'Definir el rango de celdas desde la fila 2 hasta la última fila con datos en la columna K
+    Set rangoFormato = Range("K2:K" & ultimaFila)
+    
+    'Aplicar formato de color y bordes al rango definido
+    With rangoFormato
+        .Interior.Color = RGB(204, 255, 204) 'Color HEX: #CCFFCC
+        .Borders.LineStyle = xlContinuous
+        .Borders.Color = RGB(0, 0, 0)
+        .Borders.Weight = xlThin
+    End With
+    
+    'Recorrer las celdas de la columna K y agregar el valor
+    For Each celda In rangoFormato
+        ' Verificar si las celdas en las columnas H y J están vacías
+        If Not IsEmpty(celda.Offset(0, -3).Value) And Not IsEmpty(celda.Offset(0, -1).Value) Then
+            valorH = celda.Offset(0, -3).Value
+            valorJ = celda.Offset(0, -1).Value
+            
+            ' Evitar la división por cero
+            If valorJ <> 0 Then
+                resultado = Round(valorH / valorJ, 0)
+            Else
+                resultado = 0
+            End If
+            
+            celda.Value = resultado
+        End If
+    Next celda
+End Sub
+
+
+Sub BorrarColumnaK()
+    'Establecer la última fila con datos en la columna K
+    ultimaFila = Cells(Rows.Count, "K").End(xlUp).Row
+    
+    'Verificar si la última fila con datos es mayor o igual a la fila 2
+    If ultimaFila >= 2 Then
+        'Borrar los valores en la columna K desde la fila 2 hasta la última fila
+        Range("K2:K" & ultimaFila).ClearContents
+    End If
+End Sub
+
+Sub BorrarColumnaJ()
+    'Establecer la última fila con datos en la columna J
+    ultimaFila = Cells(Rows.Count, "J").End(xlUp).Row
+    
+    'Verificar si la última fila con datos es mayor o igual a la fila 2
+    If ultimaFila >= 2 Then
+        'Borrar los valores en la columna J desde la fila 2 hasta la última fila
+        Range("J2:J" & ultimaFila).ClearContents
+    End If
+End Sub
+
+Sub CopiarFormato()
+' CopiarFormato Macro
+    Columns("J:K").Select
+    Selection.Copy
+    Columns("O:P").Select
+    Selection.PasteSpecial Paste:=xlPasteFormats, Operation:=xlNone, _
+        SkipBlanks:=False, Transpose:=False
+    Application.CutCopyMode = False
+    With Selection
+        .VerticalAlignment = xlTop
+        .WrapText = True
+        .Orientation = 0
+        .AddIndent = False
+        .IndentLevel = -1
+        .ShrinkToFit = False
+        .ReadingOrder = xlContext
+        .MergeCells = False
+    End With
+    With Selection
+        .HorizontalAlignment = xlGeneral
+        .VerticalAlignment = xlTop
+        .WrapText = True
+        .Orientation = 0
+        .AddIndent = False
+        .IndentLevel = 0
+        .ShrinkToFit = False
+        .ReadingOrder = xlContext
+        .MergeCells = False
+    End With
+    With Selection
+        .HorizontalAlignment = xlCenter
+        .VerticalAlignment = xlTop
+        .WrapText = True
+        .Orientation = 0
+        .AddIndent = False
+        .IndentLevel = 0
+        .ShrinkToFit = False
+        .ReadingOrder = xlContext
+        .MergeCells = False
+    End With
+    Columns("O:P").EntireColumn.AutoFit
+    Range("O2").Select
+End Sub
+Sub BorrarColumnasOyP()
+    'Establecer la última fila con datos en la columna O
+    ultimaFilaO = Cells(Rows.Count, "O").End(xlUp).Row
+    
+    'Establecer la última fila con datos en la columna P
+    ultimaFilaP = Cells(Rows.Count, "P").End(xlUp).Row
+    
+    'Verificar si la última fila con datos en la columna O es mayor o igual a la fila 2
+    If ultimaFilaO >= 2 Then
+        'Borrar los valores en la columna O desde la fila 2 hasta la última fila
+        Range("O2:O" & ultimaFilaO).ClearContents
+    End If
+    
+    'Verificar si la última fila con datos en la columna P es mayor o igual a la fila 2
+    If ultimaFilaP >= 2 Then
+        'Borrar los valores en la columna P desde la fila 2 hasta la última fila
+        Range("P2:P" & ultimaFilaP).ClearContents
+    End If
+End Sub
+Sub ActualizarColumnaO()
+    Dim ultimaFilaR As Long
+    Dim ultimaFilaO As Long
+    Dim i As Long
+    Dim valorO As String
+    Dim rangoFormato As Range
+    
+    ' 1. Copiar y pegar valores de la columna R a la columna O
+    ' Obtener la última fila con datos en la columna R
+    ultimaFilaR = Cells(Rows.Count, "R").End(xlUp).Row
+    
+    ' Si la columna R solo tiene el encabezado, salir de la macro
+    If ultimaFilaR = 1 Then Exit Sub
+    
+    ' Copiar los valores de la columna R (sin el encabezado) a la columna O
+    Range("R2:R" & ultimaFilaR).Copy Destination:=Range("O2")
+    
+    ' 2. Actualizar las fórmulas en la columna P
+    ' Obtener la última fila con datos en la columna O
+    ultimaFilaO = Cells(Rows.Count, "O").End(xlUp).Row
+    
+    ' Recorrer las celdas de la columna P y agregar la fórmula
+    For i = 2 To ultimaFilaO
+        valorO = Cells(i, "O").Value
+        If Cells(i, "H").Value = "" And Cells(i, "J").Value = "" Then
+            Cells(i, "P").Value = ""
+        Else
+            Cells(i, "P").Value = Replace(Replace(valorO, " días", ""), " día", "")
+        End If
+    Next i
+    
+    ' 3. Aplicar formato a la columna P
+    Set rangoFormato = Range("P2:P" & ultimaFilaO)
+    With rangoFormato
+        .Interior.Color = RGB(204, 255, 204) 'Color HEX: #CCFFCC
+        .Borders.LineStyle = xlContinuous
+        .Borders.Color = RGB(0, 0, 0)
+        .Borders.Weight = xlThin
+    End With
+End Sub
+Sub BorrarColumnaP()
+    'Establecer la última fila con datos en la columna P
+    ultimaFila = Cells(Rows.Count, "P").End(xlUp).Row
+    
+    'Verificar si la última fila con datos es mayor o igual a la fila 2
+    If ultimaFila >= 2 Then
+        'Borrar los valores en la columna P desde la fila 2 hasta la última fila
+        Range("P2:P" & ultimaFila).ClearContents
+    End If
+End Sub
+Sub BorrarColumnasRyS()
+    'Establecer la última fila con datos en la columna R
+    ultimaFilaR = Cells(Rows.Count, "R").End(xlUp).Row
+    
+    'Establecer la última fila con datos en la columna S
+    ultimaFilaS = Cells(Rows.Count, "S").End(xlUp).Row
+    
+    'Verificar si la última fila con datos en la columna R es mayor o igual a la fila 2
+    If ultimaFilaR >= 2 Then
+        'Borrar los valores en la columna R desde la fila 2 hasta la última fila
+        Range("R2:R" & ultimaFilaR).ClearContents
+    End If
+    
+    'Verificar si la última fila con datos en la columna S es mayor o igual a la fila 2
+    If ultimaFilaS >= 2 Then
+        'Borrar los valores en la columna S desde la fila 2 hasta la última fila
+        Range("S2:S" & ultimaFilaS).ClearContents
+    End If
+End Sub
+Sub BorrarColumnasAaH()
+    Dim col As Variant
+    Dim ultimaFila As Long
+    Dim columnas() As Variant
+    
+    ' Definimos un array con las letras de las columnas
+    columnas = Array("A", "B", "C", "D", "E", "F", "G", "H")
+    
+    ' Recorremos cada columna desde A hasta H
+    For Each col In columnas
+        'Establecer la última fila con datos para la columna actual
+        ultimaFila = Cells(Rows.Count, col).End(xlUp).Row
+        
+        'Verificar si la última fila con datos es mayor o igual a la fila 2
+        If ultimaFila >= 2 Then
+            'Borrar los valores en la columna desde la fila 2 hasta la última fila
+            Range(col & "2:" & col & ultimaFila).ClearContents
+        End If
+    Next col
+End Sub
+Sub BorrarTodoExceptoEncabezados()
+    Dim ultimaCol As Long
+    Dim ultimaFila As Long
+    Dim rango As Range
+    
+    ' Establecer la última columna con datos de la hoja completa
+    ultimaCol = ActiveSheet.Cells.Find(What:="*", After:=Range("A1"), SearchOrder:=xlByColumns, SearchDirection:=xlPrevious).Column
+    
+    ' Establecer la última fila con datos
+    ultimaFila = ActiveSheet.Cells.Find(What:="*", After:=Range("A1"), SearchOrder:=xlByRows, SearchDirection:=xlPrevious).Row
+    
+    ' Si la última fila con datos es la fila 1 (solo encabezados), salir de la macro
+    If ultimaFila = 1 Then Exit Sub
+    
+    ' Definir el rango desde A2 hasta la última columna y última fila con datos
+    Set rango = Range("A2:" & Cells(ultimaFila, ultimaCol).Address)
+    
+    ' Borrar los contenidos de las celdas
+    rango.ClearContents
+    
+    ' Quitar el formato de las celdas
+    rango.ClearFormats
+    
+End Sub
+Sub BorrarTodoExceptoEncabezados_presupuesto()
+    Dim ws As Worksheet
+    Dim ultimaCol As Long
+    Dim ultimaFila As Long
+    Dim rango As Range
+
+    ' Establecer referencia a la hoja "PRESUPUESTO"
+    Set ws = ThisWorkbook.Sheets("PRESUPUESTO")
+    
+    ' Establecer la última columna con datos de la hoja
+    ultimaCol = ws.Cells.Find(What:="*", After:=ws.Range("A1"), SearchOrder:=xlByColumns, SearchDirection:=xlPrevious).Column
+    
+    ' Establecer la última fila con datos
+    ultimaFila = ws.Cells.Find(What:="*", After:=ws.Range("A1"), SearchOrder:=xlByRows, SearchDirection:=xlPrevious).Row
+    
+    ' Si la última fila con datos es la fila 1 (solo encabezados), salir de la macro
+    If ultimaFila = 1 Then Exit Sub
+    
+    ' Definir el rango desde A2 hasta la última columna y última fila con datos en la hoja "PRESUPUESTO"
+    Set rango = ws.Range("A2:" & ws.Cells(ultimaFila, ultimaCol).Address)
+    
+    ' Borrar los contenidos de las celdas
+    rango.ClearContents
+    
+    ' Quitar el formato de las celdas
+    rango.ClearFormats
+    
+End Sub
