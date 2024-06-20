@@ -21,6 +21,6 @@ Este repositorio contiene una colección de códigos y recursos diversos desarro
 
 ## Contacto
 
-- [![LinkedIn](https://img.icons8.com/color/48/000000/linkedin.png)](https://www.linkedin.com/in/henryzumaeta)
-- [![GitHub](https://img.icons8.com/ios-filled/50/000000/github.png)](https://github.com/HenryZumaeta)
-- [![Email](https://img.icons8.com/color/48/000000/email.png)](mailto:henry.zumaeta.l@uni.pe)
+[![LinkedIn](https://img.icons8.com/color/48/000000/linkedin.png)](https://www.linkedin.com/in/henryzumaeta)&nbsp;
+[![GitHub](https://img.icons8.com/ios-filled/50/000000/github.png)](https://github.com/HenryZumaeta)&nbsp;
+[![Email](https://img.icons8.com/color/48/000000/email.png)](mailto:henry.zumaeta.l@uni.pe)
